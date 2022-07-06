@@ -1,4 +1,9 @@
 pipeline {
+    environment {
+        registry = "20.106.226.83:8085/chatapp"
+        registryCredential = 'nexushub'
+        dockerImage = ''
+    }
     agent any 
     // agent is where my pipeline will be eexecuted
     tools {
@@ -11,56 +16,26 @@ pipeline {
             git credentialsId: 'gitlab-token', url: 'https://github.com/gopal1409/springchat1.git'
             }
         }
-        stage('mvn build') {
+         stage('build it') {
             steps {
-            sh "mvn -Dmaven.test.failure.ignore=true clean package"
+            sh 'mvn clean package'
             }
-            post {
-                //if maven build was able to run the test we will create a test report and archive the jar in local machine
-                success {
-                    junit '**/target/surefire-reports/*.xml'
-                    archiveArtifacts 'target/*.jar'
+        }
+        stage('docker image') {
+            steps {
+                script {
+                  dockerImage=docker.build registry + ":$BUILD_NUMBER"
                 }
             }
         }
-        stage('checkstyle') {
+        stage('docker push') {
             steps {
-                sh 'mvn checkstyle:checkstyle'
+                script {
+                  docker.withRegistry('http://20.106.226.83:8085',registryCredential) {
+                      dockerImage.push()
+                  }
+                }
             }
         }
-         stage('checkstyle Report') {
-            steps {
-                recordIssues(tools: [checkStyle(pattern: 'target/checkstyle-result.xml')])
-            }
-        }
-        stage('code coverage') {
-            steps {
-                jacoco()
-            }
-        }
-        stage('sonar scanner') {
-            steps {
-           sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=chatapp -Dsonar.host.url=http://20.84.106.226:9000 -Dsonar.login=sqp_01fbbdbe2afe58b1e7fcbb623f52798f5c8dacf1'
-            }
-        }
-        stage ('Nexus upload')  {
-          steps {
-          nexusArtifactUploader(
-          nexusVersion: 'nexus3',
-          protocol: 'http',
-          nexusUrl: '20.106.226.83:8081',
-          groupId: 'websocket-demo',
-          version: '0.0.1-SNAPSHOT',
-          repository: 'maven-snapshots',
-          credentialsId: 'nexus-cred',
-          artifacts: [
-            [artifactId: 'websocket-demo',
-             classifier: '',
-             file: 'target/websocket-demo-0.0.1-SNAPSHOT.jar',
-             type: 'jar']
-        ]
-        )
-          }
-     }
     }
 }
