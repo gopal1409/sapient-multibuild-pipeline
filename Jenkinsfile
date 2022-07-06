@@ -1,66 +1,42 @@
 pipeline {
-    agent any 
-    // agent is where my pipeline will be eexecuted
+    agent any
+
     tools {
-        //install the maven version configured as m2 and add it to the path
+        // Install the Maven version configured as "M3" and add it to the path.
         maven "m3"
     }
+
     stages {
-        stage('pull from scm') {
+        stage('Build') {
             steps {
-            git credentialsId: 'gitlab-token', url: 'https://github.com/gopal1409/springchat1.git'
+                // Get some code from a GitHub repository
+                git 'https://github.com/gopal1409/jenkins-ansible-tomcat.git'
+
+                // Run Maven on a Unix agent.
+                sh "mvn -Dmaven.test.failure.ignore=true clean package"
+
+                // To run Maven on a Windows agent, use
+                // bat "mvn -Dmaven.test.failure.ignore=true clean package"
             }
-        }
-        stage('mvn build') {
-            steps {
-            sh "mvn -Dmaven.test.failure.ignore=true clean package"
-            }
+
             post {
-                //if maven build was able to run the test we will create a test report and archive the jar in local machine
+                // If Maven was able to run the tests, even if some of the test
+                // failed, record the test results and archive the jar file.
                 success {
-                    junit '**/target/surefire-reports/*.xml'
+                    junit '**/target/surefire-reports/TEST-*.xml'
                     archiveArtifacts 'target/*.jar'
                 }
             }
         }
-        stage('checkstyle') {
-            steps {
-                sh 'mvn checkstyle:checkstyle'
-            }
+        stage('ansible deploy') {
+           steps {
+                // Get some code from a GitHub repository
+                ansiblePlaybook credentialsId: 'ansible-jenkins', disableHostKeyChecking: true, inventory: 'dev.inv', playbook: 'tomcat.yml'
+
+                // To run Maven on a Windows agent, use
+                // bat "mvn -Dmaven.test.failure.ignore=true clean package"
+            } 
         }
-         stage('checkstyle Report') {
-            steps {
-                recordIssues(tools: [checkStyle(pattern: 'target/checkstyle-result.xml')])
-            }
-        }
-        stage('code coverage') {
-            steps {
-                jacoco()
-            }
-        }
-        stage('sonar scanner') {
-            steps {
-           sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=chatapp -Dsonar.host.url=http://20.84.106.226:9000 -Dsonar.login=sqp_01fbbdbe2afe58b1e7fcbb623f52798f5c8dacf1'
-            }
-        }
-        stage ('Nexus upload')  {
-          steps {
-          nexusArtifactUploader(
-          nexusVersion: 'nexus3',
-          protocol: 'http',
-          nexusUrl: '20.106.226.83:8081',
-          groupId: 'websocket-demo',
-          version: '0.0.1-SNAPSHOT',
-          repository: 'maven-snapshots',
-          credentialsId: 'nexus-cred',
-          artifacts: [
-            [artifactId: 'websocket-demo',
-             classifier: '',
-             file: 'target/websocket-demo-0.0.1-SNAPSHOT.jar',
-             type: 'jar']
-        ]
-        )
-          }
-     }
     }
 }
+
