@@ -1,0 +1,58 @@
+---
+#ansy playbook start with three dash
+-
+###this minus in yaml indicate a list of items. the play contains a list of play
+  hosts: tomcat
+  vars:
+    tomcat_download_url: https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.64/bin/apache-tomcat-9.0.64.tar.gz
+    tomcat_download_location: /usr/share/tomcat/apache-tomcat-9.0.64.tar.gz
+  
+  tasks:
+    - name: install java 
+      apt:
+        name: default-jdk
+        state: present 
+    - name: add group tomcat
+      group:
+        name: tomcat
+        state: present 
+    - name: add user tomcat 
+      user:
+        name: tomcat
+        group: tomcat
+        home: /usr/share/tomcat createhome=no
+        state: present
+    #download the tomcat package
+    - name: create a tomcat directory 
+      file: 
+        path: /usr/share/tomcat 
+        state: directory
+        owner: tomcat 
+        group: tomcat 
+    - name: Download tomcat 
+      get_url: 
+        url: "{{tomcat_download_url}}"
+        dest: "{{tomcat_download_location}}"
+    
+    #extract the tomcat archive
+    - name: extract tomcat 
+      unarchive:
+        src: "{{tomcat_download_location}}"
+        dest: /usr/share/tomcat 
+        owner: tomcat 
+        group: tomcat 
+        remote_src: yes 
+        extra_opts: [--strip-components=1]
+        creates: /usr/share/tomcat/bin 
+    - name: copy tomcat service 
+      template:
+        src: templates/tomcat.service.j2
+        dest: /etc/systemd/system/tomcat.service
+      when: ansible_service_mgr == 'systemd'
+    - name: start and enable tomcat_
+      service:
+        daemon_reload: yes
+        name: tomcat 
+        state: started 
+        enabled: yes
+      when: ansible_service_mgr == 'systemd'
